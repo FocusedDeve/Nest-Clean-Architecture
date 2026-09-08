@@ -105,6 +105,7 @@ clean-architecture/
 - NestJS — Scalable backend framework.
 - TypeORM — ORM abstraction layer.
 - SQLite / PostgreSQL / MySQL — Multi-database support.
+- Swagger / OpenAPI — Interactive API documentation.
 - Docker — Containerized development & deployment.
 - DotEnv — Environment-based configuration.
 - ESLint + Prettier — Code formatting and linting standards.
@@ -122,10 +123,58 @@ DB_PORT='5432'
 DB_USERNAME=''
 DB_PASSWORD=''
 DB_NAME=''
+
+SWAGGER_ENABLED=true
+SWAGGER_PATH='docs'
 ```
 
 - DB_TYPE supports: 'sqlite', 'postgres', 'mysql'
 - Other DB credentials are required only for PostgreSQL or MySQL
+- SWAGGER_ENABLED / SWAGGER_PATH are optional (defaults: enabled, mounted on `docs`)
+
+## 📖 API Documentation (Swagger)
+
+Start the app and open:
+
+| URL | Content |
+| --- | --- |
+| `http://localhost:3000/docs` | Swagger UI |
+| `http://localhost:3000/docs/json` | Raw OpenAPI document |
+
+Set `SWAGGER_ENABLED=false` to not expose the docs (e.g. in production), or `SWAGGER_PATH` to mount them elsewhere.
+
+Property schemas are produced by the `@nestjs/swagger` CLI plugin declared in `nest-cli.json`, so the HTTP models stay free of `@ApiProperty`. The plugin only introspects files ending in `.request.ts` and `.response.ts` — the use-case DTOs in `application/interfaces` are intentionally left out, keeping OpenAPI a concern of the delivery layer. It also only runs through the Nest CLI (`nest build` / `nest start`).
+
+### Reading the documented responses
+
+Controllers never throw and never set the transport status: they resolve with a `CoreResponse` envelope, so the HTTP status is always `200` — `201` on POST. **The real outcome is the `code` field inside the body**, and each operation lists the `code` values it can return.
+
+```json
+{
+  "code": 404,
+  "data": null,
+  "errors": ["User with ID 42 not found"]
+}
+```
+
+The one exception is a non-numeric `:id`: `ParseIntPipe` rejects it before the handler runs, producing a genuine HTTP 400 with Nest's standard error shape.
+
+Routes are annotated with the helpers in `src/interfaces/http/swagger/`:
+
+```ts
+@Get(':id')
+@ApiOperation({ summary: 'Fetch one user by id' })
+@ApiParam({ name: 'id', type: 'integer', example: 1 })
+@ApiCoreResponse(GetUserOutputResponseModel, {
+    isArray: true,
+    codes: [
+        { code: 404, meaning: 'no user with that id' },
+        { code: 500, meaning: 'the repository failed' },
+    ],
+})
+@ApiInvalidIdResponse()
+async userById(@Param('id', ParseIntPipe) id: number) { /* ... */ }
+```
 
 ## 🧱 Database Strategy (Factory Pattern)
 

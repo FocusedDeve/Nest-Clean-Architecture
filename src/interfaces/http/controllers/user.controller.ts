@@ -6,7 +6,10 @@ import { Result } from "@domain/core/result";
 import { CreateUserResponseModel, GetUserOutputResponseModel, UpdatedUserResponseModel } from "../dto/responses/user";
 import { CreateUserUseCaseInput, DeleteUserUseCaseInput, GetUserUseCaseOutput, UpdatedUserUseCaseInput } from "@application/interfaces/user";
 import { CreateUserRequestModel, UpdateUserRequestModel } from "../dto/requests/user";
+import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiCoreResponse, ApiInvalidIdResponse } from "../swagger";
 
+@ApiTags('user')
 @Controller('user')
 export class UserController {
     constructor(
@@ -17,6 +20,15 @@ export class UserController {
     ){}
 
     @Get()
+    @ApiOperation({ summary: 'List every user' })
+    @ApiCoreResponse(GetUserOutputResponseModel, {
+        isArray: true,
+        description: 'Returns all users.',
+        codes: [
+            { code: 204, meaning: 'no user in the database — `data` is `null`, not an empty array' },
+            { code: 500, meaning: 'the repository failed' },
+        ],
+    })
     async allUser() : Promise<CoreResponse<GetUserOutputResponseModel[]>> {
         // Assuming GetUserUseCase.execute() now returns Result<GetUserUseCaseOutput[]>
         const usersResult: Result<GetUserUseCaseOutput[]> = await this.getUserCase.execute();
@@ -36,6 +48,17 @@ export class UserController {
     }
 
     @Get(':id')
+    @ApiOperation({ summary: 'Fetch one user by id' })
+    @ApiParam({ name: 'id', type: 'integer', example: 1 })
+    @ApiCoreResponse(GetUserOutputResponseModel, {
+        isArray: true,
+        description: 'The single user is still wrapped in an array, so the shape matches `GET /user`.',
+        codes: [
+            { code: 404, meaning: 'no user with that id' },
+            { code: 500, meaning: 'the repository failed' },
+        ],
+    })
+    @ApiInvalidIdResponse()
     async userById(
         @Param('id', ParseIntPipe) id: number
     ) : Promise<CoreResponse<GetUserOutputResponseModel[]>> 
@@ -60,6 +83,17 @@ export class UserController {
     }
 
     @Post()
+    @ApiOperation({ summary: 'Create a user' })
+    @ApiCoreResponse(CreateUserResponseModel, {
+        httpStatus: 201,
+        successCode: 201,
+        description: 'The body is not validated: there is no global `ValidationPipe` and the request model carries no constraints.',
+        codes: [
+            { code: 409, meaning: 'the repository reported the user already exists' },
+            { code: 400, meaning: 'any other creation failure' },
+            { code: 500, meaning: 'creation reported success but returned no data' },
+        ],
+    })
     async create(@Body() requestModel: CreateUserRequestModel) : Promise<CoreResponse<CreateUserResponseModel>> {
         const userInput: CreateUserUseCaseInput = plainToInstance(CreateUserUseCaseInput, requestModel);
         
@@ -82,6 +116,17 @@ export class UserController {
     }
 
     @Put(':id')
+    @ApiOperation({ summary: 'Update a user' })
+    @ApiParam({ name: 'id', type: 'integer', example: 1 })
+    @ApiCoreResponse(UpdatedUserResponseModel, {
+        description: 'The `id` in the body must equal the `id` in the path.',
+        codes: [
+            { code: 400, meaning: 'path and body `id` do not match, or the update failed' },
+            { code: 404, meaning: 'no user with that id' },
+            { code: 500, meaning: 'the update reported success but returned no data' },
+        ],
+    })
+    @ApiInvalidIdResponse()
     async updateUserById(
         @Param('id', ParseIntPipe) id:number,
         @Body() requestModel: UpdateUserRequestModel
@@ -112,6 +157,17 @@ export class UserController {
     }
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Delete a user' })
+    @ApiParam({ name: 'id', type: 'integer', example: 1 })
+    @ApiCoreResponse(Boolean, {
+        description: 'On success `data` is `true`.',
+        codes: [
+            { code: 400, meaning: '`id` is 0' },
+            { code: 404, meaning: 'nothing was deleted — most likely no user with that id' },
+            { code: 500, meaning: 'the repository failed' },
+        ],
+    })
+    @ApiInvalidIdResponse()
     async deleteUserById(
         @Param('id', ParseIntPipe) id:number,
     ):Promise<CoreResponse<Boolean>> {

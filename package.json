@@ -24,6 +24,7 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.20",
     "@nestjs/platform-express": "^11.0.20",
+    "@nestjs/swagger": "^11.4.7",
     "@nestjs/typeorm": "^11.0.0",
     "better-sqlite3": "^12.9.0",
     "class-transformer": "^0.5.1",
